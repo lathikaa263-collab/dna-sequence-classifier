@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DNA Sequence Classifier</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #101827;
+  color: #f1f5f9;
+}
+
+header {
+  text-align: center;
+  padding: 35px 15px;
+  background: #172d42;
+}
+
+header h1 {
+  color: #55d6be;
+  margin-bottom: 10px;
+}
+
+header p {
+  color: #bdcbd8;
+}
+
+.container {
+  max-width: 850px;
+  margin: 25px auto;
+  padding: 20px;
+}
+
+.card {
+  background: #1c2b3c;
+  padding: 22px;
+  border-radius: 14px;
+  margin-bottom: 20px;
+}
+
+h2 {
+  color: #55d6be;
+}
+
+textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #53677b;
+  background: #101827;
+  color: white;
+  font-size: 16px;
+}
+
+button {
+  background: #55d6be;
+  color: #10202a;
+  border: none;
+  border-radius: 8px;
+  padding: 13px 22px;
+  margin-top: 15px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #36bda5;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+td, th {
+  border: 1px solid #53677b;
+  padding: 11px;
+  text-align: center;
+}
+
+th {
+  background: #294258;
+}
+
+.result {
+  color: #55d6be;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+footer {
+  text-align: center;
+  padding: 25px;
+  color: #9aabba;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>DNA Sequence Classification</h1>
+  <p>Machine Learning Approach in Genomics</p>
+</header>
+
+<div class="container">
+
+<div class="card">
+  <h2>About the Project</h2>
+  <p>
+    This project classifies DNA sequences into Group A
+    or Group B using nucleotide features and a
+    nearest-neighbour machine learning algorithm.
+  </p>
+</div>
+
+<div class="card">
+  <h2>Training Dataset</h2>
+  <table>
+    <tr>
+      <th>Sequence ID</th>
+      <th>DNA Sequence</th>
+      <th>Group</th>
+    </tr>
+    <tr><td>S1</td><td>ATGCGATC</td><td>A</td></tr>
+    <tr><td>S2</td><td>ATGCGTAC</td><td>A</td></tr>
+    <tr><td>S3</td><td>GCGCGTAT</td><td>B</td></tr>
+    <tr><td>S4</td><td>GCGCGCGC</td><td>B</td></tr>
+  </table>
+  <p>These are the four labelled training examples from the assignment.</p>
+</div>
+
+<div class="card">
+  <h2>Enter Unknown DNA Sequence</h2>
+  <textarea id="dna">ATGCCGCATC</textarea>
+  <button onclick="classifyDNA()">Classify Sequence</button>
+</div>
+
+<div class="card">
+  <h2>Extracted Features</h2>
+  <div id="features">Enter a valid DNA sequence and click Classify.</div>
+</div>
+
+<div class="card">
+  <h2>Classification Result</h2>
+  <div id="result">Waiting for sequence...</div>
+</div>
+
+<div class="card">
+  <h2>Model Accuracy</h2>
+  <div id="accuracy">Not calculated yet.</div>
+</div>
+
+<div class="card">
+  <h2>Interpretation</h2>
+  <div id="interpretation">
+    The prediction will be explained here.
+  </div>
+</div>
+
+</div>
+
+<footer>
+  DNA Sequence Classification | Machine Learning Project
+  <br>Created using HTML, CSS and JavaScript
+</footer>
+
+<script>
+
+// Labelled training dataset
+const trainingData = [
+  { sequence: "ATGCGATC", group: "A" },
+  { sequence: "ATGCGTAC", group: "A" },
+  { sequence: "GCGCGTAT", group: "B" },
+  { sequence: "GCGCGCGC", group: "B" }
+];
+
+// Extract numerical features
+function extractFeatures(sequence) {
+  const A = [...sequence].filter(x => x === "A").length;
+  const T = [...sequence].filter(x => x === "T").length;
+  const G = [...sequence].filter(x => x === "G").length;
+  const C = [...sequence].filter(x => x === "C").length;
+  const length = sequence.length;
+  const gc = ((G + C) / length) * 100;
+
+  return [A, T, G, C, length, gc];
+}
+
+// Standardized feature distance
+function distance(a, b, data) {
+  return Math.sqrt(a.reduce((sum, value, i) => {
+    const column = data.map(row => row[i]);
+    const mean = column.reduce((x, y) => x + y, 0) / column.length;
+    const variance = column.reduce(
+      (x, y) => x + (y - mean) ** 2, 0
+    ) / column.length;
+    const sd = Math.sqrt(variance) || 1;
+
+    return sum + ((value - b[i]) / sd) ** 2;
+  }, 0));
+}
+
+// Predict using nearest neighbour
+function predict(sequence, dataset) {
+  const features = extractFeatures(sequence);
+  const rows = dataset.map(item => ({
+    features: extractFeatures(item.sequence),
+    group: item.group
+  }));
+
+  const nearest = rows.map(row => ({
+    group: row.group,
+    distance: distance(features, row.features,
+      rows.map(r => r.features))
+  })).sort((a, b) => a.distance - b.distance)[0];
+
+  return nearest;
+}
+
+// Leave-one-out validation
+function calculateAccuracy() {
+  let correct = 0;
+
+  trainingData.forEach((item, index) => {
+    const remaining = trainingData.filter(
+      (_, i) => i !== index
+    );
+
+    const prediction = predict(item.sequence, remaining);
+
+    if (prediction.group === item.group) correct++;
+  });
+
+  return (correct / trainingData.length) * 100;
+}
+
+// Main classification function
+function classifyDNA() {
+  const sequence = document.getElementById("dna")
+    .value.toUpperCase().replace(/\s/g, "");
+
+  if (!sequence || !/^[ATGC]+$/.test(sequence)) {
+    alert("Please enter a valid DNA sequence using A, T, G and C only.");
+    return;
+  }
+
+  const f = extractFeatures(sequence);
+
+  document.getElementById("features").innerHTML = `
+    <table>
+      <tr><th>Feature</th><th>Value</th></tr>
+      <tr><td>A Count</td><td>${f[0]}</td></tr>
+      <tr><td>T Count</td><td>${f[1]}</td></tr>
+      <tr><td>G Count</td><td>${f[2]}</td></tr>
+      <tr><td>C Count</td><td>${f[3]}</td></tr>
+      <tr><td>Sequence Length</td><td>${f[4]}</td></tr>
+      <tr><td>GC Content</td><td>${f[5].toFixed(2)}%</td></tr>
+    </table>`;
+
+  const prediction = predict(sequence, trainingData);
+
+  document.getElementById("result").innerHTML =
+    `<p class="result">Predicted Group: ${prediction.group}</p>
+     <p>Nearest training example distance: ${prediction.distance.toFixed(3)}</p>`;
+
+  const accuracy = calculateAccuracy();
+
+  document.getElementById("accuracy").innerHTML =
+    `<p class="result">${accuracy.toFixed(2)}%</p>
+     <p>Leave-one-out validation on the four training sequences.</p>`;
+
+  document.getElementById("interpretation").innerHTML =
+    `The unknown DNA sequence was classified into
+    Group ${prediction.group}. The model compared its
+    numerical features with the labelled training
+    sequences and selected the closest example.
+    Its prediction should be interpreted cautiously
+    because the training dataset is very small.`;
+}
+
+// Display default sequence result
+classifyDNA();
+
+</script>
+</body>
+</html>
